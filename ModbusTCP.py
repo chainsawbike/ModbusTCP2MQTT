@@ -48,43 +48,18 @@ argument_list = full_cmd_arguments[1:]
 short_options = 'i:p:m:M:o:U:P:l:s:t'
 long_options = ['ip=', 'port=', 'model=', 'mqtt_host=', 'mqtt_port=',
                  'mqtt_user=', 'mqtt_pass=', 'log_level=', 'scan=', 'timeout=']
-try:
-    arguments, values = getopt.getopt(
-        argument_list, short_options, long_options)
-except getopt.error as e:
-    raise ValueError('Invalid parameters!')
 
-for current_argument, current_value in arguments:
-    if current_value == 'null' or len(current_value) == 0 or current_value.isspace():
-        pass
-    elif current_argument in ("-i", "--ip"):
-        options['inverter_ip'] = current_value
-    elif current_argument in ("-p", "--port"):
-        options['inverter_port'] = current_value
-    elif current_argument in ("-m", "--model"):
-        options['model'] = current_value
-    elif current_argument in ("-M", "--mqtt_host"):
-        options['mqtt_host'] = current_value 
-    elif current_argument in ("-o", "--mqtt_port"):
-        options['mqtt_port'] = int(current_value)
-    elif current_argument in ("-U", "--mqtt_user"):
-        options['mqtt_user'] = current_value 
-    elif current_argument in ("-P", "--mqtt_pass"):
-        options['mqtt_pass'] = current_value 
-    elif current_argument in ("-l", "--log_level"):
-        options['log_level'] = current_value
-    elif current_argument in ("-s", "--scan"):
-        options['scan_interval'] = int(current_value)
-    elif current_argument in ("-t", "--timeout"):
-        options['timeout'] = int(current_value)
+options['inverter_ip'] = "10.0.0.122"
+options['inverter_port'] = 502    
+options['model'] = "sungrow-sh10rt"
+options['mqtt_host'] = "10.0.0.1"
+options['mqtt_port'] = 1883
+options['timeout'] = 3
+options['scan_interval'] = 10
+
 
     
-if options['log_level'] == 'WARNING':
-    log_level = logging.WARNING
-elif options['log_level'] == 'INFO':
-    log_level = logging.INFO
-else:
-    log_level = logging.DEBUG
+log_level = logging.DEBUG
 logging.basicConfig(level=log_level)
 
 if "sungrow-" in options['model']:
@@ -136,7 +111,7 @@ logging.info("Modbus connected")
 
 # Configure MQTT
 mqtt_client = mqtt.Client("ModbusTCP")
-mqtt_client.username_pw_set(options['mqtt_user'], options['mqtt_pass'])
+# mqtt_client.username_pw_set(options['mqtt_user'], options['mqtt_pass'])
 if options['mqtt_port'] == 8883:
     mqtt_client.tls_set()
 
@@ -310,12 +285,41 @@ def publish_mqtt_discovery(inverter):
         manufacturer = 'SMA'
     DISCOVERY_PAYLOAD = '{{"name": "Inverter {}", "uniq_id":"{}","stat_t": "{}", "json_attr_t": "{}", "unit_of_meas": "{}","dev_cla": "{}","state_class": "{}", "val_tpl": "{{{{ value_json.{} }}}}", "ic": "mdi:solar-power","device":{{ "name": "Solar Inverter","mf": "{}", "mdl": "{}", "connections":[["address", "{}" ]] }} }}'
     
-    energy_today_msg = DISCOVERY_PAYLOAD.format("Energy Today","inverter_energy_today", SENSOR_TOPIC, SENSOR_TOPIC, "kWh", "energy", "total_increasing", "daily_power_yield / 1000", manufacturer, options['model'], options['inverter_ip'])
-    energy_month_msg = DISCOVERY_PAYLOAD.format("Energy Monthly","inverter_energy_month", SENSOR_TOPIC, SENSOR_TOPIC, "kWh", "energy", "total_increasing", "monthly_power_yield / 1000", manufacturer, options['model'], options['inverter_ip'])
-    power_msg = DISCOVERY_PAYLOAD.format("Power", "inverter_power", SENSOR_TOPIC, SENSOR_TOPIC, "W", "power", "measurement","total_pv_power", manufacturer, options['model'], options['inverter_ip'], options['inverter_port'])
-    result = mqtt_client.publish(DISCOVERY_TOPIC.format("energy_today"), energy_today_msg)
-    result = mqtt_client.publish(DISCOVERY_TOPIC.format("energy_monthly"), energy_month_msg)        
-    result = mqtt_client.publish(DISCOVERY_TOPIC.format("power"), power_msg)
+    energy_generated_today_msg = DISCOVERY_PAYLOAD.format("Energy generated Today","inverter_energy_today", SENSOR_TOPIC, SENSOR_TOPIC, "kWh", "energy", "total_increasing", "daily_power_yield / 1000", manufacturer, options['model'], options['inverter_ip'])
+    energy_generated_total_msg = DISCOVERY_PAYLOAD.format("Energy generated total","inverter_energy_total", SENSOR_TOPIC, SENSOR_TOPIC, "kWh", "energy", "total_increasing", "total_power_yield / 1000", manufacturer, options['model'], options['inverter_ip'])
+    
+    energy_consumed_today_msg = DISCOVERY_PAYLOAD.format("Energy consumed Today","energy_consumed_today", SENSOR_TOPIC, SENSOR_TOPIC, "kWh", "energy", "total_increasing", "daily_use_energy / 1000", manufacturer, options['model'], options['inverter_ip'])
+    energy_consumed_total_msg = DISCOVERY_PAYLOAD.format("Energy consumed total","total_energy_consumed", SENSOR_TOPIC, SENSOR_TOPIC, "kWh", "energy", "total_increasing", "total_use_energy / 1000", manufacturer, options['model'], options['inverter_ip'])
+    
+    energy_exported_today_msg = DISCOVERY_PAYLOAD.format("Energy exported Today","energy_exported_today", SENSOR_TOPIC, SENSOR_TOPIC, "kWh", "energy", "total_increasing", "daily_export_energy / 1000", manufacturer, options['model'], options['inverter_ip'])
+    energy_exported_total_msg = DISCOVERY_PAYLOAD.format("Energy consumed total","total_energy_consumed", SENSOR_TOPIC, SENSOR_TOPIC, "kWh", "energy", "total_increasing", "total_export_energy / 1000", manufacturer, options['model'], options['inverter_ip'])
+    
+    energy_imported_today_msg = DISCOVERY_PAYLOAD.format("Energy imported Today","energy_imported_today", SENSOR_TOPIC, SENSOR_TOPIC, "kWh", "energy", "total_increasing", "daily_import_energy / 1000", manufacturer, options['model'], options['inverter_ip'])
+    energy_imported_total_msg = DISCOVERY_PAYLOAD.format("Energy imported total","total_energy_imported", SENSOR_TOPIC, SENSOR_TOPIC, "kWh", "energy", "total_increasing", "total_import_energy / 1000", manufacturer, options['model'], options['inverter_ip'])   
+    
+    generated_power_msg = DISCOVERY_PAYLOAD.format("Generated Power", "inverter_generated_power", SENSOR_TOPIC, SENSOR_TOPIC, "W", "power", "measurement","total_pv_power", manufacturer, options['model'], options['inverter_ip'], options['inverter_port'])
+    
+    load_power_msg = DISCOVERY_PAYLOAD.format("Power Load", "load_power", SENSOR_TOPIC, SENSOR_TOPIC, "W", "power", "measurement","load_power", manufacturer, options['model'], options['inverter_ip'], options['inverter_port'])
+    
+    exported_power_msg = DISCOVERY_PAYLOAD.format("exported Power", "exported_power", SENSOR_TOPIC, SENSOR_TOPIC, "W", "power", "measurement","export_power", manufacturer, options['model'], options['inverter_ip'], options['inverter_port'])
+    
+    result = mqtt_client.publish(DISCOVERY_TOPIC.format("energy_generated_today"), energy_generated_today_msg)
+    result = mqtt_client.publish(DISCOVERY_TOPIC.format("energy_generated_total"), energy_generated_total_msg)
+    
+    result = mqtt_client.publish(DISCOVERY_TOPIC.format("energy_consumed_today"), energy_consumed_today_msg)
+    result = mqtt_client.publish(DISCOVERY_TOPIC.format("energy_consumed_total"), energy_consumed_total_msg)
+    
+    result = mqtt_client.publish(DISCOVERY_TOPIC.format("energy_exported_today"), energy_exported_today_msg)
+    result = mqtt_client.publish(DISCOVERY_TOPIC.format("energy_exported_total"), energy_exported_total_msg)
+    
+    result = mqtt_client.publish(DISCOVERY_TOPIC.format("energy_imported_today"), energy_imported_today_msg)
+    result = mqtt_client.publish(DISCOVERY_TOPIC.format("energy_imported_total"), energy_imported_total_msg)
+    
+    result = mqtt_client.publish(DISCOVERY_TOPIC.format("generated_power"), generated_power_msg)
+    result = mqtt_client.publish(DISCOVERY_TOPIC.format("load_power"), load_power_msg)
+    result = mqtt_client.publish(DISCOVERY_TOPIC.format("exported_power"), exported_power_msg)
+    
+    
     result.wait_for_publish()
 
 
